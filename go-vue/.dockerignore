@@ -1,0 +1,4 @@
+frontend-vue/node_modules
+frontend-vue/dist
+backend-go/texas-equity-api
+.git
