@@ -1,8 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const RANKS = 'AKQJT98765432'
 const SUITS = 'shdc'
 const SUIT_SYMBOLS: Record<string, string> = { s: '♠', h: '♥', d: '♦', c: '♣' }
+
+function getAllCards(): string[] {
+  return RANKS.split('').flatMap((r) => SUITS.split('').map((s) => r + s))
+}
+
+function getTwoUnusedCards(used: string[]): [string, string] {
+  const set = new Set(used)
+  const available = getAllCards().filter((c) => !set.has(c))
+  return [available[0], available[1]]
+}
+
+function codeToObj(code: string): { rank: string; suit: string } {
+  return { rank: code[0], suit: code[1] }
+}
 
 type Preset = 'fast' | 'standard' | 'high'
 type BoardCount = 0 | 3 | 4 | 5
@@ -39,14 +53,43 @@ export default function App() {
     { rank: 'K', suit: 'd' },
   ])
   const [boardCount, setBoardCount] = useState<BoardCount>(3)
-  const [boardCards, setBoardCards] = useState<{ rank: string; suit: string }[]>([
-    { rank: '7', suit: 'h' },
-    { rank: '8', suit: 'h' },
-    { rank: '2', suit: 'c' },
-    { rank: '2', suit: 'c' },
-    { rank: '2', suit: 'c' },
-  ])
+  const [boardCards, setBoardCards] = useState<{ rank: string; suit: string }[]>(() => {
+    const b0 = { rank: '7', suit: 'h' }
+    const b1 = { rank: '8', suit: 'h' }
+    const b2 = { rank: '2', suit: 'c' }
+    const used = ['As', 'Kd', '7h', '8h', '2c']
+    const [c3, c4] = getTwoUnusedCards(used)
+    return [b0, b1, b2, codeToObj(c3), codeToObj(c4)]
+  })
   const [preset, setPreset] = useState<Preset>('standard')
+
+  useEffect(() => {
+    const used = [
+      ...heroCards.map((c) => c.rank + c.suit),
+      ...boardCards.slice(0, 3).map((c) => c.rank + c.suit),
+    ]
+    const [c3, c4] = getTwoUnusedCards(used)
+    setBoardCards((prev) => {
+      const cur3 = prev[3].rank + prev[3].suit
+      const cur4 = prev[4].rank + prev[4].suit
+      if (cur3 === c3 && cur4 === c4) return prev
+      const next = [...prev]
+      next[3] = codeToObj(c3)
+      next[4] = codeToObj(c4)
+      return next
+    })
+  }, [
+    heroCards[0]?.rank,
+    heroCards[0]?.suit,
+    heroCards[1]?.rank,
+    heroCards[1]?.suit,
+    boardCards[0]?.rank,
+    boardCards[0]?.suit,
+    boardCards[1]?.rank,
+    boardCards[1]?.suit,
+    boardCards[2]?.rank,
+    boardCards[2]?.suit,
+  ])
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<Result | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -115,10 +158,10 @@ export default function App() {
   const sectionStyle = { marginTop: '1.5rem', marginBottom: '0.5rem' }
   const labelBlock = { display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' } as const
   const selectStyle = { fontSize: '1.1rem', padding: '0.35rem 0.5rem', minHeight: '2.25rem' } as const
-  const handRow = { display: 'flex', flexDirection: 'row' as const, flexWrap: 'nowrap' as const, gap: '0.35rem', alignItems: 'center' }
-  const boardRow = { display: 'flex', flexDirection: 'row' as const, flexWrap: 'nowrap' as const, gap: '0.35rem', alignItems: 'center' }
+  const handRow = { display: 'flex', flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: '0.35rem', alignItems: 'center' }
+  const boardRow = { display: 'flex', flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: '0.35rem', alignItems: 'center' }
   const cardBlock = {
-    display: 'flex',
+    display: 'inline-flex',
     alignItems: 'center',
     gap: '0.25rem',
     padding: '0.35rem 0.5rem',
@@ -126,11 +169,15 @@ export default function App() {
     borderRadius: '6px',
     background: '#fafafa',
     flex: '0 0 auto',
+    whiteSpace: 'nowrap' as const,
   }
 
   return (
-    <main>
-      <h1>Texas Hold&apos;em 勝率計算（モンテカルロ）</h1>
+    <main style={{ maxWidth: '100%', overflowX: 'hidden', boxSizing: 'border-box' }}>
+      <h1 style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25em', margin: 0 }}>
+        <span>Texas Hold&apos;em 勝率計算</span>
+        <span>（モンテカルロ）</span>
+      </h1>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
         <label style={{ ...labelBlock, fontSize: '1.25rem' }}>
@@ -150,16 +197,6 @@ export default function App() {
           {[0, 1].map((i) => (
             <div key={i} style={cardBlock}>
               <select
-                value={heroCards[i]?.rank ?? ''}
-                onChange={(e) => setHeroCard(i, 'rank', e.target.value)}
-                aria-label={`手札${i + 1} ランク`}
-                style={selectStyle}
-              >
-                {RANKS.split('').map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
-              <select
                 value={heroCards[i]?.suit ?? ''}
                 onChange={(e) => setHeroCard(i, 'suit', e.target.value)}
                 aria-label={`手札${i + 1} スート`}
@@ -169,9 +206,19 @@ export default function App() {
                   <option key={s} value={s}>{SUIT_SYMBOLS[s]}</option>
                 ))}
               </select>
+              <select
+                value={heroCards[i]?.rank ?? ''}
+                onChange={(e) => setHeroCard(i, 'rank', e.target.value)}
+                aria-label={`手札${i + 1} ランク`}
+                style={selectStyle}
+              >
+                {RANKS.split('').map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
               <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
                 {heroCards[i]?.rank && heroCards[i]?.suit ? (
-                  <>{heroCards[i].rank}<span style={isRedSuit(heroCards[i].suit) ? { color: '#c00' } : {}}>{SUIT_SYMBOLS[heroCards[i].suit]}</span></>
+                  <><span style={isRedSuit(heroCards[i].suit) ? { color: '#c00' } : {}}>{SUIT_SYMBOLS[heroCards[i].suit]}</span>{heroCards[i].rank}</>
                 ) : '—'}
               </span>
             </div>
@@ -193,45 +240,83 @@ export default function App() {
           </select>
         </label>
         {boardCount > 0 && (
-          <div style={boardRow}>
-            {Array.from({ length: boardCount }, (_, i) => (
-              <div key={i} style={cardBlock}>
-                <select
-                  value={boardCards[i]?.rank ?? ''}
-                  onChange={(e) => setBoardCard(i, 'rank', e.target.value)}
-                  aria-label={`ボード${i + 1} ランク`}
-                  style={selectStyle}
-                >
-                  {RANKS.split('').map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-                <select
-                  value={boardCards[i]?.suit ?? ''}
-                  onChange={(e) => setBoardCard(i, 'suit', e.target.value)}
-                  aria-label={`ボード${i + 1} スート`}
-                  style={selectStyle}
-                >
-                  {SUITS.split('').map((s) => (
-                    <option key={s} value={s}>{SUIT_SYMBOLS[s]}</option>
-                  ))}
-                </select>
-                <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
-                  {boardCards[i]?.rank && boardCards[i]?.suit ? (
-                    <>{boardCards[i].rank}<span style={isRedSuit(boardCards[i].suit) ? { color: '#c00' } : {}}>{SUIT_SYMBOLS[boardCards[i].suit]}</span></>
-                  ) : '—'}
-                </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <div style={boardRow}>
+              {Array.from({ length: Math.min(3, boardCount) }, (_, i) => (
+                <div key={i} style={cardBlock}>
+                  <select
+                    value={boardCards[i]?.suit ?? ''}
+                    onChange={(e) => setBoardCard(i, 'suit', e.target.value)}
+                    aria-label={`ボード${i + 1} スート`}
+                    style={selectStyle}
+                  >
+                    {SUITS.split('').map((s) => (
+                      <option key={s} value={s}>{SUIT_SYMBOLS[s]}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={boardCards[i]?.rank ?? ''}
+                    onChange={(e) => setBoardCard(i, 'rank', e.target.value)}
+                    aria-label={`ボード${i + 1} ランク`}
+                    style={selectStyle}
+                  >
+                    {RANKS.split('').map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                  <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    {boardCards[i]?.rank && boardCards[i]?.suit ? (
+                      <><span style={isRedSuit(boardCards[i].suit) ? { color: '#c00' } : {}}>{SUIT_SYMBOLS[boardCards[i].suit]}</span>{boardCards[i].rank}</>
+                    ) : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {boardCount >= 4 && (
+              <div style={boardRow}>
+                {Array.from({ length: boardCount - 3 }, (_, j) => {
+                  const i = j + 3
+                  return (
+                    <div key={i} style={cardBlock}>
+                      <select
+                        value={boardCards[i]?.suit ?? ''}
+                        onChange={(e) => setBoardCard(i, 'suit', e.target.value)}
+                        aria-label={`ボード${i + 1} スート`}
+                        style={selectStyle}
+                      >
+                        {SUITS.split('').map((s) => (
+                          <option key={s} value={s}>{SUIT_SYMBOLS[s]}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={boardCards[i]?.rank ?? ''}
+                        onChange={(e) => setBoardCard(i, 'rank', e.target.value)}
+                        aria-label={`ボード${i + 1} ランク`}
+                        style={selectStyle}
+                      >
+                        {RANKS.split('').map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                      <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                        {boardCards[i]?.rank && boardCards[i]?.suit ? (
+                          <><span style={isRedSuit(boardCards[i].suit) ? { color: '#c00' } : {}}>{SUIT_SYMBOLS[boardCards[i].suit]}</span>{boardCards[i].rank}</>
+                        ) : '—'}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
-            ))}
+            )}
           </div>
         )}
 
-        <h2 style={sectionStyle}>計算オプション</h2>
+        <h2 style={sectionStyle}>検証件数</h2>
         <label style={labelBlock}>
-          <select value={preset} onChange={(e) => setPreset(e.target.value as Preset)} style={selectStyle} aria-label="プリセット">
-            <option value="fast">高速 (50k)</option>
-            <option value="standard">標準 (200k)</option>
-            <option value="high">高精度 (1M)</option>
+          <select value={preset} onChange={(e) => setPreset(e.target.value as Preset)} style={selectStyle} aria-label="検証件数">
+            <option value="fast">高速（50,000通り）</option>
+            <option value="standard">標準（200,000通り）</option>
+            <option value="high">高精度（1,000,000通り）</option>
           </select>
         </label>
         <button type="submit" disabled={loading} style={{ marginTop: '0.5rem', padding: '0.5rem 1rem', alignSelf: 'flex-start' }}>

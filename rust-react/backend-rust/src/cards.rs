@@ -4,7 +4,7 @@
 const RANKS: &str = "AKQJT98765432";
 const SUITS: &str = "shdc";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Card {
     pub rank: u8,  // 0=2, 12=A
     pub suit: u8,  // 0=s,1=h,2=d,3=c

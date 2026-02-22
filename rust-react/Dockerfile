@@ -4,16 +4,15 @@ WORKDIR /app
 COPY frontend-react/ .
 RUN npm install --legacy-peer-deps && npm run build
 
-# Stage 2: build Rust backend
-FROM rust:1.82-alpine AS backend
+# Stage 2: build Rust backend (glibc for faster allocator than musl)
+FROM rust:1.82-bookworm AS backend
 WORKDIR /app
-RUN apk add --no-cache musl-dev
 COPY backend-rust/ .
 RUN cargo build --release --bins
 
-# Stage 3: runtime
-FROM alpine:3.19
-RUN apk add --no-cache ca-certificates
+# Stage 3: runtime (glibc to match backend binary)
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV STATIC_DIR=/app/dist
 COPY --from=frontend /app/dist ./dist

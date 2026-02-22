@@ -73,6 +73,18 @@ export function getNextAvailableCard(used: Set<string>): string {
 }
 
 /**
+ * Return the first two cards (in RANKS×SUITS order) not in the used set.
+ * Used to fill board 4th/5th with non-duplicate cards.
+ */
+export function getTwoUnusedCards(used: Set<string>): [string, string] {
+  const c1 = getNextAvailableCard(used);
+  const used2 = new Set(used);
+  used2.add(c1);
+  const c2 = getNextAvailableCard(used2);
+  return [c1, c2];
+}
+
+/**
  * Resolve duplicates: process hero then board (first boardCount slots) in order,
  * replacing any duplicate with the next available card. Returns new arrays.
  */
