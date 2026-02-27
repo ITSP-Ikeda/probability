@@ -17,19 +17,34 @@ func runGenPreflop(args []string) {
 	fs := flag.NewFlagSet("gen-preflop", flag.ExitOnError)
 	out := fs.String("out", "assets/data/preflop_table.v1.json", "output JSON path")
 	trials := fs.Int64("trials", defaultTrials, "trials per hand")
+	mode := fs.String("mode", "monte_carlo", "generation mode: monte_carlo or exact")
+	playersMin := fs.Int("players-min", 2, "minimum players")
+	playersMax := fs.Int("players-max", 10, "maximum players")
 	_ = fs.Parse(args)
 
 	handClasses := AllHandClasses()
-	playersMin, playersMax := 2, 10
+	if *playersMin < 2 || *playersMax > 10 || *playersMin > *playersMax {
+		fmt.Fprintf(os.Stderr, "invalid players range: %d..%d (allowed 2..10)\n", *playersMin, *playersMax)
+		os.Exit(1)
+	}
+	if *mode != "monte_carlo" && *mode != "exact" {
+		fmt.Fprintf(os.Stderr, "invalid mode: %s (use monte_carlo or exact)\n", *mode)
+		os.Exit(1)
+	}
+	if *mode == "exact" && (*playersMin != 2 || *playersMax != 2) {
+		fmt.Fprintf(os.Stderr, "exact mode currently supports only players=2; use --players-min 2 --players-max 2\n")
+		os.Exit(1)
+	}
 
 	data := make(map[string]map[string]PreflopRow)
-	for p := playersMin; p <= playersMax; p++ {
+	for p := *playersMin; p <= *playersMax; p++ {
 		data[fmt.Sprintf("%d", p)] = make(map[string]PreflopRow)
 	}
 
-	total := len(handClasses) * (playersMax - playersMin + 1)
+	total := len(handClasses) * (*playersMax - *playersMin + 1)
 	done := 0
 	start := time.Now()
+	var metricPerHand int64
 
 	for _, handClass := range handClasses {
 		cards, ok := HandClassToCards(handClass)
@@ -38,13 +53,24 @@ func runGenPreflop(args []string) {
 			continue
 		}
 		board := []Card{}
-		for players := playersMin; players <= playersMax; players++ {
-			result := Simulate(players, cards, board, int(*trials), nil)
+		for players := *playersMin; players <= *playersMax; players++ {
+			var result SimResult
+			if *mode == "exact" {
+				exact, err := ExactHeadsUpPreflop(cards)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "exact: %v\n", err)
+					os.Exit(1)
+				}
+				result = exact
+			} else {
+				result = Simulate(players, cards, board, int(*trials), nil)
+			}
 			data[fmt.Sprintf("%d", players)][handClass] = PreflopRow{
 				Win:  round6(result.Win),
 				Tie:  round6(result.Tie),
 				Lose: round6(result.Lose),
 			}
+			metricPerHand = result.Trials
 			done++
 			if done%100 == 0 {
 				fmt.Fprintf(os.Stderr, "Progress: %d/%d (%s @ %dp)\n", done, total, handClass, players)
@@ -60,10 +86,10 @@ func runGenPreflop(args []string) {
 	payload := map[string]interface{}{
 		"version":       "v1",
 		"generatedAt":   time.Now().UTC().Format(time.RFC3339),
-		"method":        "monte_carlo",
-		"trialsPerHand": *trials,
-		"playersMin":    playersMin,
-		"playersMax":    playersMax,
+		"method":        *mode,
+		"trialsPerHand": metricPerHand,
+		"playersMin":    *playersMin,
+		"playersMax":    *playersMax,
 		"data":          data,
 	}
 	raw, err := json.MarshalIndent(payload, "", "  ")

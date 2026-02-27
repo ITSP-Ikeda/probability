@@ -77,33 +77,25 @@ export async function POST(request: NextRequest) {
         );
       }
       const table = loadPreflopTable();
-      if (table == null) {
-        return NextResponse.json(
-          { error: "preflop_table_not_generated", details: "preflop table not generated. Run: npm run gen:preflop" },
-          { status: 400 }
-        );
+      if (table != null) {
+        const row = getPreflopEquity(players, handClass);
+        if (row != null) {
+          const trialsPerHand = getTrialsPerHand() ?? 0;
+          const note =
+            preset != null || (seed !== undefined && seed !== null)
+              ? "preset and seed are ignored when using preflop table"
+              : undefined;
+          return NextResponse.json({
+            win: row.win,
+            tie: row.tie,
+            lose: row.lose,
+            trials: trialsPerHand,
+            elapsedMs: 0,
+            method: "preflop_table",
+            ...(note ? { note } : {}),
+          });
+        }
       }
-      const row = getPreflopEquity(players, handClass);
-      if (row == null) {
-        return NextResponse.json(
-          { error: "preflop_table_missing_entry", details: `no entry for players=${players}, handClass=${handClass}` },
-          { status: 400 }
-        );
-      }
-      const trialsPerHand = getTrialsPerHand() ?? 0;
-      const note =
-        preset != null || (seed !== undefined && seed !== null)
-          ? "preset and seed are ignored when using preflop table"
-          : undefined;
-      return NextResponse.json({
-        win: row.win,
-        tie: row.tie,
-        lose: row.lose,
-        trials: trialsPerHand,
-        elapsedMs: 0,
-        method: "preflop_table",
-        ...(note ? { note } : {}),
-      });
     }
 
     const pres = preset == null ? "standard" : String(preset).toLowerCase();

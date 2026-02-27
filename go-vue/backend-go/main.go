@@ -122,10 +122,6 @@ func equityHandler(c echo.Context) error {
 				})
 			}
 		}
-		return c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "preflop_table_not_generated",
-			Details: strPtr("preflop table not generated. Run: go run . gen-preflop --out ./assets/data/preflop_table.v1.json --trials 2000000"),
-		})
 	}
 
 	trials := TrialsForPreset(body.Preset)

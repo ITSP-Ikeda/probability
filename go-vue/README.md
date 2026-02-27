@@ -29,9 +29,15 @@ curl -X POST http://localhost:3012/api/equity \
 ## プリフロップ固定表（任意）
 
 - **ボード0枚**のとき、169ハンドクラス×人数2〜10の固定表で即時に勝率を返します（表が生成済みの場合）。
-- 固定表は **起動時には自動生成されません**。未生成の状態でボード0枚のリクエストを送ると **400** で `preflop table not generated` を返します（フォールバックのモンテカルロは行いません）。
+- 固定表は **起動時には自動生成されません**。未生成の状態でボード0枚のリクエストを送ると、通常のモンテカルロ計算にフォールバックして結果を返します。
 - 固定表の生成（手動）:
   ```bash
+  make gen-preflop
+
+  # 試行回数を変える場合
+  make gen-preflop TRIALS=500000
+
+  # 従来コマンド（同等）
   docker compose run --rm -v $(pwd)/backend-go/assets/data:/app/assets/data app /app/texas-equity-api gen-preflop --out /app/assets/data/preflop_table.v1.json --trials 2000000
   ```
   生成後、通常起動時に同じディレクトリをマウントすると固定表が読み込まれます（compose に volumes を追加）。

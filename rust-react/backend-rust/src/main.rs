@@ -146,14 +146,6 @@ async fn equity_handler(
                 }));
             }
         }
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(ErrorResponse {
-                error: "preflop_table_not_generated".into(),
-                details: Some("preflop table not generated. Run: cargo run --bin gen_preflop_table -- ...".into()),
-                card: None,
-            }),
-        ));
     }
 
     let trials = simulate::trials_for_preset(&body.preset);
